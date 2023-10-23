@@ -178,7 +178,8 @@ public class PlayerMovement : MonoBehaviour
 
             }
             else
-                time = Time.deltaTime * speedIncreaseMultiplier;
+                time += Time.deltaTime * speedIncreaseMultiplier;
+
             yield return null;
         }
 
