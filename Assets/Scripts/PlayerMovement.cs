@@ -15,6 +15,7 @@ public class PlayerMovement : MonoBehaviour
     private float desiredMoveSpeed;
     private float lastDesiredMoveSpeed;
     public float wallrunSpeed;
+    public float climbSpeed;
 
     public float speedIncreaseMultiplier;
     public float slopeIncreaseMultiplier;
@@ -47,6 +48,9 @@ public class PlayerMovement : MonoBehaviour
     private RaycastHit slopeHit;
     private bool exitingSlope;
 
+    [Header("References")]
+    public Climbing climbingScript;
+
     public Transform orientation;
 
     float horizontalInput;
@@ -63,6 +67,7 @@ public class PlayerMovement : MonoBehaviour
         walking,
         sprinting,
         wallrunning,
+        climbing,
         crouching,
         sliding,
         air
@@ -71,6 +76,8 @@ public class PlayerMovement : MonoBehaviour
     public bool sliding;
     public bool crouching;
     public bool wallrunning;
+    public bool climbing;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -111,8 +118,15 @@ public class PlayerMovement : MonoBehaviour
 
     private void StateHandler()
     {
+        // Mode - Climbing
+        if (climbing)
+        {
+            state = MovementState.climbing;
+            desiredMoveSpeed = climbSpeed;
+        }
+
         // Mode - WallRunning
-        if(wallrunning)
+        else if(wallrunning)
         {
             state = MovementState.wallrunning;
             desiredMoveSpeed = wallrunSpeed;
@@ -225,6 +239,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void MovePlayer()
     {
+        if (climbingScript.exitingWall) return;
+
         // calculate movement direction
         moveDirection = orientation.forward*verticalInput+orientation.right*horizontalInput;
 
