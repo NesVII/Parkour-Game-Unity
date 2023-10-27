@@ -64,6 +64,8 @@ public class PlayerMovement : MonoBehaviour
 
     public enum MovementState
     {
+        freeze,
+        unlimited,
         walking,
         sprinting,
         wallrunning,
@@ -77,6 +79,11 @@ public class PlayerMovement : MonoBehaviour
     public bool crouching;
     public bool wallrunning;
     public bool climbing;
+
+    public bool freeze;
+    public bool unlimited;
+
+    public bool restricted;
 
     // Start is called before the first frame update
     void Start()
@@ -116,10 +123,25 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    bool KeepMomentum;
     private void StateHandler()
     {
+        // Mode - Freeze
+        if (freeze)
+        {
+            state = MovementState.freeze;
+            rb.velocity = Vector3.zero;
+            desiredMoveSpeed = 0f;
+        }
+
+        // Mode - Unlimited
+        else if (unlimited)
+        {
+            state = MovementState.unlimited;
+            desiredMoveSpeed = 999f;
+        }
         // Mode - Climbing
-        if (climbing)
+        else if (climbing)
         {
             state = MovementState.climbing;
             desiredMoveSpeed = climbSpeed;
@@ -138,7 +160,11 @@ public class PlayerMovement : MonoBehaviour
             state = MovementState.sliding;
 
             if (OnSlope() && rb.velocity.y < 0.1f)
+            {
                 desiredMoveSpeed = slideSpeed;
+                KeepMomentum = true;
+            }
+                
             else
                 desiredMoveSpeed = sprintSpeed;
         }
@@ -171,18 +197,28 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // check if desireMoveSpeed has changed drastically
-        if (Mathf.Abs(desiredMoveSpeed - lastDesiredMoveSpeed) > 4f && moveSpeed != 0)
+        //Mathf.Abs(desiredMoveSpeed - lastDesiredMoveSpeed) > 4f && moveSpeed != 0
+        bool desiredMoveSpeedHasChanged = desiredMoveSpeed != lastDesiredMoveSpeed;
+
+        if (desiredMoveSpeedHasChanged)
         {
-            StopAllCoroutines();
-            StartCoroutine(SmoothlyLerpMoveSpeed());
+            if (KeepMomentum)
+            {
+                StopAllCoroutines();
+                StartCoroutine(SmoothlyLerpMoveSpeed());
+            }
+            else
+            {
+                moveSpeed = desiredMoveSpeed;
+            }
         }
-        else
-        {
-            moveSpeed = desiredMoveSpeed;
-        }
+        
 
 
         lastDesiredMoveSpeed = desiredMoveSpeed;
+
+        // deactivate keepMomentum
+        if (Mathf.Abs(desiredMoveSpeed - moveSpeed) < 0.1f) KeepMomentum = false;
     }
 
     private IEnumerator SmoothlyLerpMoveSpeed()
@@ -239,6 +275,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void MovePlayer()
     {
+        if (restricted) return;
+
         if (climbingScript.exitingWall) return;
 
         // calculate movement direction
