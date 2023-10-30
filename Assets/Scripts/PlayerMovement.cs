@@ -140,6 +140,7 @@ public class PlayerMovement : MonoBehaviour
             state = MovementState.unlimited;
             desiredMoveSpeed = 999f;
         }
+
         // Mode - Climbing
         else if (climbing)
         {
@@ -277,7 +278,7 @@ public class PlayerMovement : MonoBehaviour
     {
         if (restricted) return;
 
-        if (climbingScript.exitingWall) return;
+        //if (climbingScript.exitingWall) return;
 
         // calculate movement direction
         moveDirection = orientation.forward*verticalInput+orientation.right*horizontalInput;
