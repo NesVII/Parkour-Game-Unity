@@ -61,6 +61,7 @@ public class LedgeGrabbing : MonoBehaviour
             if (timeOnLedge > minTimeOnLedge && anyInputKeyPressed) ExitLedgeHold();
 
             if (Input.GetKeyDown(jumpKey)) LedgeJump();
+            if (pm.dashing) ExitLedgeHold();
         }
 
         // Substate 2 - Exiting Ledge
@@ -89,6 +90,7 @@ public class LedgeGrabbing : MonoBehaviour
         ExitLedgeHold();
 
         Invoke(nameof(DelayedJumpForce), 0.05f);
+
     }
 
     private void DelayedJumpForce()
@@ -96,6 +98,7 @@ public class LedgeGrabbing : MonoBehaviour
         Vector3 forceToAdd = cam.forward * ledgeJumpForwardForce + orientation.up * ledgeJumpUpwardForce;
         rb.velocity = Vector3.zero;
         rb.AddForce(forceToAdd, ForceMode.Impulse);
+        Debug.Log("Jump");
     }
 
     private void EnterLedgeHold()

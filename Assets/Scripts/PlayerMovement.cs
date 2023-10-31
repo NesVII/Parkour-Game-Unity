@@ -20,6 +20,11 @@ public class PlayerMovement : MonoBehaviour
     public float speedIncreaseMultiplier;
     public float slopeIncreaseMultiplier;
 
+    public float dashSpeed;
+    public float dashSpeedChangeFactor;
+
+    public float maxYSpeed;
+
     public float groundDrag;
 
     [Header("Jumping")]
@@ -72,6 +77,7 @@ public class PlayerMovement : MonoBehaviour
         climbing,
         crouching,
         sliding,
+        dashing,
         air
     }
 
@@ -79,9 +85,10 @@ public class PlayerMovement : MonoBehaviour
     public bool crouching;
     public bool wallrunning;
     public bool climbing;
+    public bool dashing;
 
     public bool freeze;
-    public bool unlimited;
+   // public bool unlimited;
 
     public bool restricted;
 
@@ -92,6 +99,30 @@ public class PlayerMovement : MonoBehaviour
         rb.freezeRotation = true;
         readyToJump = true;
         startYScale = transform.localScale.y;
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        //ground Check
+        grounded = Physics.Raycast(transform.position, Vector3.down, 0.5f, Ground);
+        MyInput();
+        SpeedControl();
+        StateHandler();
+
+        //handle Drag
+        if (state==MovementState.walking ||state==MovementState.sprinting||state==MovementState.crouching)
+        {
+            rb.drag = groundDrag;
+        }
+        else
+            rb.drag = 0;
+        TextStuff();
+    }
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, 0.5f);
     }
 
     private void MyInput()
@@ -123,7 +154,8 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    bool KeepMomentum;
+    private bool KeepMomentum;
+    private MovementState lastState;
     private void StateHandler()
     {
         // Mode - Freeze
@@ -134,12 +166,20 @@ public class PlayerMovement : MonoBehaviour
             desiredMoveSpeed = 0f;
         }
 
+        // Mode - Dashing
+        else if (dashing)
+        {
+            state = MovementState.dashing;
+            desiredMoveSpeed = dashSpeed;
+            speedChangeFactor = dashSpeedChangeFactor;
+        }
+
         // Mode - Unlimited
-        else if (unlimited)
+       /* else if (unlimited)
         {
             state = MovementState.unlimited;
             desiredMoveSpeed = 999f;
-        }
+        }*/
 
         // Mode - Climbing
         else if (climbing)
@@ -156,13 +196,14 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // Mode - Sliding
-        if (sliding)
+        else if (sliding)
         {
             state = MovementState.sliding;
 
             if (OnSlope() && rb.velocity.y < 0.1f)
             {
                 desiredMoveSpeed = slideSpeed;
+                speedChangeFactor = speedIncreaseMultiplier;
                 KeepMomentum = true;
             }
                 
@@ -195,11 +236,18 @@ public class PlayerMovement : MonoBehaviour
         else
         {
             state = MovementState.air;
+
+            if (desiredMoveSpeed < sprintSpeed)
+                desiredMoveSpeed = walkSpeed;
+            else
+                desiredMoveSpeed = sprintSpeed;
         }
 
+        
         // check if desireMoveSpeed has changed drastically
-        //Mathf.Abs(desiredMoveSpeed - lastDesiredMoveSpeed) > 4f && moveSpeed != 0
+       //Mathf.Abs(desiredMoveSpeed - lastDesiredMoveSpeed) > 4f && moveSpeed != 0
         bool desiredMoveSpeedHasChanged = desiredMoveSpeed != lastDesiredMoveSpeed;
+        if(lastState==MovementState.dashing) KeepMomentum = false;
 
         if (desiredMoveSpeedHasChanged)
         {
@@ -210,24 +258,27 @@ public class PlayerMovement : MonoBehaviour
             }
             else
             {
+                StopAllCoroutines();
                 moveSpeed = desiredMoveSpeed;
             }
         }
-        
-
 
         lastDesiredMoveSpeed = desiredMoveSpeed;
+        lastState = state;
 
         // deactivate keepMomentum
         if (Mathf.Abs(desiredMoveSpeed - moveSpeed) < 0.1f) KeepMomentum = false;
     }
 
+    private float speedChangeFactor;
     private IEnumerator SmoothlyLerpMoveSpeed()
     {
         // smoothly lerp movementSpeed to desired value
         float time = 0;
         float difference = Mathf.Abs(desiredMoveSpeed - moveSpeed);
         float startValue = moveSpeed;
+
+        float boostFactor = speedChangeFactor;
 
         while (time < difference)
         {
@@ -237,11 +288,11 @@ public class PlayerMovement : MonoBehaviour
                 float slopeAngle = Vector3.Angle(Vector3.up, slopeHit.normal);
                 float slopeAngleIncrease = 1 + (slopeAngle / 90f);
 
-                time += Time.deltaTime * speedIncreaseMultiplier * slopeIncreaseMultiplier * slopeAngleIncrease;
+                time += Time.deltaTime * boostFactor * slopeIncreaseMultiplier * slopeAngleIncrease;
 
             }
             else
-                time += Time.deltaTime * speedIncreaseMultiplier;
+                time += Time.deltaTime * boostFactor;
 
             yield return null;
         }
@@ -250,24 +301,8 @@ public class PlayerMovement : MonoBehaviour
     }
 
 
-    // Update is called once per frame
-    void Update()
-    {
-        //ground Check
-        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight*0.5f+0.2f, Ground);
-        MyInput();
-        SpeedControl();
-        StateHandler();
+    
 
-        //handle Drag
-        if (grounded)
-        { 
-            rb.drag = groundDrag;
-        }
-        else
-            rb.drag = 0;
-        TextStuff();
-    }
 
     private void FixedUpdate()
     {
@@ -276,9 +311,11 @@ public class PlayerMovement : MonoBehaviour
 
     private void MovePlayer()
     {
+        if (state == MovementState.dashing) return;
+
         if (restricted) return;
 
-        //if (climbingScript.exitingWall) return;
+        if (climbingScript.exitingWall) return;
 
         // calculate movement direction
         moveDirection = orientation.forward*verticalInput+orientation.right*horizontalInput;
@@ -324,6 +361,10 @@ public class PlayerMovement : MonoBehaviour
             }
 
         }
+
+        // limit y vel
+        if (maxYSpeed != 0 && rb.velocity.y > maxYSpeed)
+            rb.velocity = new Vector3(rb.velocity.x, maxYSpeed, rb.velocity.z);
     }
 
     private void Jump()
