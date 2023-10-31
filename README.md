@@ -36,7 +36,7 @@ This parkour game is a playground where players can explore and move around, pra
    - Clone the repository or download the game files.
 
 2. **Run:**
-   - Execute the main executable located in the **BUILD** Folder.
+   - Open the project and Build it.
 
 ## Credits
 
