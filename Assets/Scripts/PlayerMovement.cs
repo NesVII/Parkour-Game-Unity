@@ -53,6 +53,10 @@ public class PlayerMovement : MonoBehaviour
     private RaycastHit slopeHit;
     private bool exitingSlope;
 
+    [Header("Camera Effects")]
+    public PlayerCam cam;
+    public float grappleFov = 95f;
+
     [Header("References")]
     public Climbing climbingScript;
 
@@ -88,6 +92,8 @@ public class PlayerMovement : MonoBehaviour
     public bool dashing;
 
     public bool freeze;
+
+    public bool activeGrapple;
    // public bool unlimited;
 
     public bool restricted;
@@ -111,7 +117,7 @@ public class PlayerMovement : MonoBehaviour
         StateHandler();
 
         //handle Drag
-        if (state==MovementState.walking ||state==MovementState.sprinting||state==MovementState.crouching)
+        if ((state==MovementState.walking ||state==MovementState.sprinting||state==MovementState.crouching) && !activeGrapple)
         {
             rb.drag = groundDrag;
         }
@@ -300,10 +306,6 @@ public class PlayerMovement : MonoBehaviour
         moveSpeed = desiredMoveSpeed;
     }
 
-
-    
-
-
     private void FixedUpdate()
     {
         MovePlayer();
@@ -311,6 +313,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void MovePlayer()
     {
+        if (activeGrapple) return;
+
         if (state == MovementState.dashing) return;
 
         if (restricted) return;
@@ -344,6 +348,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void SpeedControl()
     {
+        if (activeGrapple) return;
         // limiting speed on slope
         if(OnSlope() && !exitingSlope)
         {
@@ -379,6 +384,44 @@ public class PlayerMovement : MonoBehaviour
     {
         readyToJump = true;
         exitingSlope = false;
+    }
+
+    private bool enableMovementOnNextTouch;
+
+    public void JumpToPosition(Vector3 targetPosition, float trajectoryHeight)
+    {
+        activeGrapple = true;
+        velocityToSet = CalculateJumpVelocity(transform.position, targetPosition, trajectoryHeight);
+        Invoke(nameof(SetVelocity), 0.1f);
+
+        Invoke(nameof(ResetRestrictions),3f);
+    }
+
+    private Vector3 velocityToSet;
+    private void SetVelocity()
+    {
+        enableMovementOnNextTouch = true;
+        rb.velocity = velocityToSet;
+
+        cam.DoFov(grappleFov);
+    }
+
+    public void ResetRestrictions()
+    {
+        activeGrapple = false;
+        cam.DoFov(85f);
+
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (enableMovementOnNextTouch)
+        {
+            enableMovementOnNextTouch = false;
+            ResetRestrictions();
+
+            GetComponent<Grappling>().StopGrapple();
+        }
     }
 
     public bool OnSlope()
@@ -420,5 +463,17 @@ public class PlayerMovement : MonoBehaviour
         return Mathf.Round(value * mult) / mult;
     }
 
+    private Vector3 CalculateJumpVelocity(Vector3 startPoint, Vector3 endPoint, float trajectoryHeight)
+    {
+        float gravity = Physics.gravity.y;
+        float displacementY = endPoint.y - startPoint.y;
+        Vector3 displacementXZ = new Vector3(endPoint.x - startPoint.x, 0f, endPoint.z - startPoint.z);
+
+        Vector3 velocityY = Vector3.up * Mathf.Sqrt(displacementY - 2 * gravity * trajectoryHeight);
+        Vector3 velocityXZ = displacementXZ / (Mathf.Sqrt(-2 * trajectoryHeight / gravity)
+            + Mathf.Sqrt(2 * (displacementY - trajectoryHeight) / gravity));
+
+        return velocityXZ + velocityY;
+    }
     
 }
