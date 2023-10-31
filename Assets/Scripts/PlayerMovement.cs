@@ -16,6 +16,7 @@ public class PlayerMovement : MonoBehaviour
     private float lastDesiredMoveSpeed;
     public float wallrunSpeed;
     public float climbSpeed;
+    public float swingSpeed;
 
     public float speedIncreaseMultiplier;
     public float slopeIncreaseMultiplier;
@@ -82,6 +83,7 @@ public class PlayerMovement : MonoBehaviour
         crouching,
         sliding,
         dashing,
+        swinging,
         air
     }
 
@@ -90,6 +92,7 @@ public class PlayerMovement : MonoBehaviour
     public bool wallrunning;
     public bool climbing;
     public bool dashing;
+    public bool swinging;
 
     public bool freeze;
 
@@ -110,20 +113,23 @@ public class PlayerMovement : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        //ground Check
-        grounded = Physics.Raycast(transform.position, Vector3.down, 0.5f, Ground);
-        MyInput();
-        SpeedControl();
-        StateHandler();
-
-        //handle Drag
-        if ((state==MovementState.walking ||state==MovementState.sprinting||state==MovementState.crouching) && !activeGrapple)
+        if (!PauseMenu.isPaused)
         {
-            rb.drag = groundDrag;
+            //ground Check
+            grounded = Physics.Raycast(transform.position, Vector3.down, 0.5f, Ground);
+            MyInput();
+            SpeedControl();
+            StateHandler();
+
+            //handle Drag
+            if ((state == MovementState.walking || state == MovementState.sprinting || state == MovementState.crouching) && !activeGrapple)
+            {
+                rb.drag = groundDrag;
+            }
+            else
+                rb.drag = 0;
+            TextStuff();
         }
-        else
-            rb.drag = 0;
-        TextStuff();
     }
     private void OnDrawGizmosSelected()
     {
@@ -170,6 +176,13 @@ public class PlayerMovement : MonoBehaviour
             state = MovementState.freeze;
             rb.velocity = Vector3.zero;
             desiredMoveSpeed = 0f;
+        }
+
+        // Mode - Swinging
+        else if (swinging)
+        {
+            state = MovementState.swinging;
+            desiredMoveSpeed = swingSpeed;
         }
 
         // Mode - Dashing
@@ -314,6 +327,7 @@ public class PlayerMovement : MonoBehaviour
     private void MovePlayer()
     {
         if (activeGrapple) return;
+        if (swinging) return;
 
         if (state == MovementState.dashing) return;
 
